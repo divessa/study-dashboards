@@ -77,6 +77,7 @@ export interface Task {
   done: boolean;
 }
 export interface Module {
+  provider?: string;
   moduleCode?: string;
   legacyStatus?: Status;
   lectureRegistration?: (typeof registrations)[number];
@@ -108,6 +109,13 @@ export interface Data {
   modules: Module[];
   updatedAt: string;
   migrations?: string[];
+  profile?: {
+    institution: string;
+    program: string;
+    semesters: string[];
+    currentSemester: number;
+    notices?: { semester: number; message: string; links: { label: string; url: string }[] }[];
+  };
 }
 export const fixedStatuses: readonly Status[] = [
   "Angemeldet",

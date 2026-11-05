@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -40,7 +40,7 @@ import {
 } from "recharts";
 import {
   areas,
-  semesters,
+  semesters as defaultSemesters,
   statuses,
   credits,
   registrations,
@@ -65,6 +65,8 @@ import {
 import { migrateData, legacyPlan } from "./migration";
 import { parseData, serialize } from "./storage";
 import type { CloudAccess } from "../private-cloud/Gate";
+
+const SemesterContext = createContext<readonly string[]>(defaultSemesters);
 
 type Page =
   | "overview"
@@ -152,6 +154,8 @@ export default function App({initial, cloud}: {initial: Data; cloud: CloudAccess
   const [scenario, setScenario] = useState<Module[] | null>(null),
     [imported, setImported] = useState<Data | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const semesters = data.profile?.semesters ?? defaultSemesters;
+  const currentSemester = data.profile?.currentSemester ?? 0;
   const stats = calculate(data.modules);
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
@@ -408,6 +412,7 @@ export default function App({initial, cloud}: {initial: Data; cloud: CloudAccess
   }
 
   return (
+    <SemesterContext.Provider value={semesters}>
     <div className="app-shell">
       <aside className={`sidebar ${mobile ? "open" : ""}`}>
         <a
@@ -445,7 +450,7 @@ export default function App({initial, cloud}: {initial: Data; cloud: CloudAccess
           <div className="campus">
             <span className="tum">ECTS</span>
             <div>
-              Studienkompass<small>Beispielplanung</small>
+              {data.profile?.institution || "Studienkompass"}<small>{data.profile?.program || "Studienplanung"}</small>
             </div>
           </div>
           <div className="local-status">
@@ -480,7 +485,7 @@ export default function App({initial, cloud}: {initial: Data; cloud: CloudAccess
             <strong>{nav.find((x) => x.id === page)?.title}</strong>
           </div>
           <div className="top-actions">
-            <span className="semester-chip">Studienplanung</span>
+            <span className="semester-chip">{semesters[currentSemester]}</span>
             <button
               className="icon-button"
               title={dark ? "Helle Darstellung" : "Dunkle Darstellung"}
@@ -496,7 +501,7 @@ export default function App({initial, cloud}: {initial: Data; cloud: CloudAccess
           <div className="page-heading">
             <div>
               <div className="eyebrow">
-                DEINE STUDIENPLANUNG
+                {data.profile?.institution || "DEINE STUDIENPLANUNG"}
               </div>
               <h1>
                 {page === "overview"
@@ -510,7 +515,7 @@ export default function App({initial, cloud}: {initial: Data; cloud: CloudAccess
                     ? "Aufgehoben für später. Diese Module zählen nicht zum Fortschritt."
                     : page === "planner"
                       ? "Probiere deine nächste Entscheidung aus. Deine echten Daten bleiben bis zur Übernahme unverändert."
-                      : "Plane deinen Weg durch den Dein Masterstudium."}
+                      : "Plane deinen Weg durch dein Studium."}
               </p>
             </div>
             <div className="heading-actions">
@@ -551,7 +556,7 @@ export default function App({initial, cloud}: {initial: Data; cloud: CloudAccess
                     <span className="hero-tag">
                       <GraduationCap size={15} /> DEIN WEG ZUM MASTER
                     </span>
-                    <h2>Dein Masterstudium</h2>
+                    <h2>{data.profile?.program || "Dein Masterstudium"}</h2>
                     <p>
                       4 Semester <span>·</span> 120 ECTS
                     </p>
@@ -585,8 +590,15 @@ export default function App({initial, cloud}: {initial: Data; cloud: CloudAccess
                   </span>
                 </div>
               </section>
+              {data.profile?.notices?.filter(notice => notice.semester === currentSemester).map((notice, i) => <div className="notice" key={i}>{notice.message} {notice.links.map(link => <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer">{link.label} </a>)}</div>)}
               <div className="metrics">
                 {[
+                  {
+                    label: "Aktuelles Semester · geplant",
+                    value: semesterStats(data.modules, currentSemester).workload,
+                    caption: `${semesters[currentSemester]} · Arbeitsaufwand`,
+                    icon: CalendarDays,
+                  },
                   {
                     label: "Tatsächlich erworben",
                     value: stats.earned,
@@ -814,8 +826,8 @@ export default function App({initial, cloud}: {initial: Data; cloud: CloudAccess
                     <small>{i + 1}. SEMESTER</small>
                     <strong>{s}</strong>
                     <span>
-                      {n(semesterStats(data.modules, i).registered)} ECTS
-                      verbindlich
+                      {n(semesterStats(data.modules, i).workload)} ECTS
+                      geplant
                     </span>
                   </button>
                 ))}
@@ -839,6 +851,7 @@ export default function App({initial, cloud}: {initial: Data; cloud: CloudAccess
               </div>
               <div className="mini-metrics">
                 {Object.entries({
+                  "Geplanter Arbeitsaufwand": semesterStats(data.modules, selectedSemester).workload,
                   "Verbindlich anrechenbar": semesterStats(
                     data.modules,
                     selectedSemester,
@@ -870,14 +883,22 @@ export default function App({initial, cloud}: {initial: Data; cloud: CloudAccess
                   </div>
                 ))}
               </div>
-              {semesterStats(data.modules, selectedSemester).registered >
+              {semesterStats(data.modules, selectedSemester).workload >
                 30 && (
                 <div className="notice">
-                  Deine verbindliche Belegung liegt über der Empfehlung von 30
+                  Dein geplanter Arbeitsaufwand liegt über der Empfehlung von 30
                   ECTS. Auch Module mit offener Anrechnung verursachen
                   Arbeitsaufwand.
                 </div>
               )}
+              <section className="panel official">
+                <h2>Geplanter Arbeitsaufwand nach Studienbereich</h2>
+                <p>Diese Planung zählt jedes Modul einmal. Bestandene ECTS und die Anrechenbarkeit werden getrennt ausgewiesen.</p>
+                {semesterStats(data.modules, selectedSemester).workload > semesterStats(data.modules, selectedSemester).registered && <p>{n(semesterStats(data.modules, selectedSemester).workload - semesterStats(data.modules, selectedSemester).registered)} geplante ECTS sind noch nicht in der verbindlich anrechenbaren Bereichsabdeckung enthalten (offene Zuordnung oder Bereichsgrenze).</p>}
+                {areas.map(a => ({...a, planned: stats.unique.filter(m => m.semester === selectedSemester && m.area === a.id && binding(m)).reduce((sum,m) => sum + m.ects,0)})).filter(a => a.planned > 0).map(a => <div key={a.id}><span>{a.name}</span><strong>{n(a.planned)} ECTS</strong></div>)}
+                {Array.from(new Set(stats.unique.filter(m => m.semester === selectedSemester && binding(m) && m.provider).map(m => m.provider!))).map(provider => <div key={provider}><span>Davon {provider}</span><strong>{n(stats.unique.filter(m => m.semester === selectedSemester && binding(m) && m.provider === provider).reduce((sum,m) => sum + m.ects,0))} ECTS</strong></div>)}
+              </section>
+              {data.profile?.notices?.filter(notice => notice.semester === selectedSemester).map((notice, i) => <div className="notice" key={i}>{notice.message} {notice.links.map(link => <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer">{link.label} </a>)}</div>)}
               <section className="panel">
                 {moduleRows(
                   data.modules.filter(
@@ -1112,15 +1133,18 @@ export default function App({initial, cloud}: {initial: Data; cloud: CloudAccess
         </div>
       )}
     </div>
+    </SemesterContext.Provider>
   );
 }
 
 function LoadChart({ modules }: { modules: Module[] }) {
+  const semesters = useContext(SemesterContext);
   const chart = semesters.map((s, i) => ({
     name: s,
     Verbindlich: semesterStats(modules, i).registered,
     Bestanden: semesterStats(modules, i).earned,
     Geplant: semesterStats(modules, i).tentative,
+    Arbeitsaufwand: semesterStats(modules, i).workload,
     Empfehlung: 30,
   }));
   return (
@@ -1148,6 +1172,7 @@ function LoadChart({ modules }: { modules: Module[] }) {
             radius={[4, 4, 0, 0]}
           />
           <Bar dataKey="Geplant" fill="#89a8d5" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="Arbeitsaufwand" fill="#ba8b54" radius={[4, 4, 0, 0]} />
           <Bar dataKey="Empfehlung" fill="#dce5df" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
@@ -1166,6 +1191,7 @@ function ModuleEditor({
   save: (m: Module) => void;
   remove: (id: string) => void;
 }) {
+  const semesters = useContext(SemesterContext);
   const [m, setM] = useState<Module>({
       ...module,
       planStatus: legacyPlan(module),
@@ -1382,6 +1408,10 @@ function ModuleEditor({
                   value={m.moduleCode || ""}
                   onChange={(e) => field("moduleCode", e.target.value)}
                 />
+              </label>
+              <label>
+                Hochschule / Anbieter
+                <input value={m.provider || ""} onChange={(e) => field("provider", e.target.value)} />
               </label>
               <label>
                 Persönliche Studienplanung
@@ -1713,6 +1743,7 @@ function Planner({
   setScenario: (m: Module[] | null) => void;
   apply: (m: Module[]) => void;
 }) {
+  const semesters = useContext(SemesterContext);
   const [extra, setExtra] = useState(15),
     [sem, setSem] = useState(1),
     [area, setArea] = useState<Area>("ie"),
@@ -2271,6 +2302,7 @@ function CalendarView({
 }
 
 function Grades({ modules }: { modules: Module[] }) {
+  const semesters = useContext(SemesterContext);
   const stats = calculate(modules),
     graded = stats.unique.filter(
       (m) =>

@@ -33,6 +33,10 @@ export function parseData(raw: string): Data {
     throw new Error(
       "Unbekanntes oder beschädigtes Dateiformat. Erwartet wird ein Studienkompass-Export (Version 1).",
     );
+  if (d.profile !== undefined) {
+    const p = d.profile;
+    if (!obj(p) || typeof p.institution !== "string" || typeof p.program !== "string" || !Array.isArray(p.semesters) || p.semesters.length !== 4 || !p.semesters.every(x => typeof x === "string" && x.length <= 100) || !Number.isInteger(p.currentSemester) || Number(p.currentSemester) < 0 || Number(p.currentSemester) > 3 || (p.notices !== undefined && (!Array.isArray(p.notices) || p.notices.some((notice: unknown) => !obj(notice) || !Number.isInteger(notice.semester) || Number(notice.semester) < 0 || Number(notice.semester) > 3 || typeof notice.message !== "string" || !Array.isArray(notice.links) || notice.links.some((link: unknown) => !obj(link) || typeof link.label !== "string" || typeof link.url !== "string" || !/^https:\/\//i.test(link.url)))))) throw Error("Ungültige Studienprofil-Daten.");
+  }
   const ids = new Set<string>();
   if (
     d.migrations !== undefined &&
@@ -95,7 +99,7 @@ export function parseData(raw: string): Data {
         throw Error(
           "Ungültiger Planungs-, Anmeldungs- oder Anerkennungsstatus.",
         );
-    for (const key of ["moduleCode", "recognitionNotes", "planningNotes"])
+    for (const key of ["moduleCode", "recognitionNotes", "planningNotes", "provider"])
       if (m[key] !== undefined && typeof m[key] !== "string")
         throw Error("Ungültige Zusatzinformationen.");
     if (
