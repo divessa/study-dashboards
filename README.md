@@ -1,5 +1,5 @@
 # Private study dashboards
 
-Two static dashboards are being adapted for Firebase Authentication and owner-only Firestore synchronization. This branch is not deployed and must not be used for private data until the production account, rules, registration settings and authorization tests are complete. The original local project and database remain the data sources.
+Two static dashboards use Firebase Authentication and owner-only Firestore rules for academic records. Records and backups are separate from this repository. Each dashboard supports a local JSON export and a cloud backup with history.
 
-See `private-cloud/README.md` for the build and migration setup. Backups, database files, credentials and generated configuration must stay outside Git.
+See `private-cloud/README.md` for deployment configuration, security rules and migration details. Never commit databases, personal exports, generated owner rules or credentials.
