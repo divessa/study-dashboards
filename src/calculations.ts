@@ -20,15 +20,17 @@ function identityName(m: Module) {
     .replace(/\s*[·–-]?\s*(vorlesung|übung|lecture|exercise)\s*$/, "");
   return n
     .replace(/^advanced topics on /, "advanced topics of ")
-    .replace(
-      /^masterseminar(?: information engineering)?$/,
-      "master seminar information engineering",
-    );
+    .replace(/^masterseminar(?=\s|$)/, "master seminar");
 }
 export function calculate(
   modules: Module[],
   options: { assumeRecognition?: boolean } = {},
 ) {
+  const namedSeminars = new Set(modules.filter(m => m.area === "seminar").map(identityName).filter(name => name.startsWith("master seminar ")));
+  const identity = (m: Module) => {
+    const name = identityName(m);
+    return m.area === "seminar" && name === "master seminar" && namedSeminars.size === 1 ? [...namedSeminars][0] : name;
+  };
   const ids = modules.map((_, i) => i);
   const find = (i: number): number =>
     ids[i] === i ? i : (ids[i] = find(ids[i]));
@@ -36,7 +38,7 @@ export function calculate(
   modules.forEach((m, i) => {
     for (const key of [
       "id:" + m.id,
-      "name:" + identityName(m),
+      "name:" + identity(m),
       ...(m.moduleCode ? ["key:" + normalize(m.moduleCode)] : []),
       ...(m.creditKey ? ["key:" + normalize(m.creditKey)] : []),
     ]) {
