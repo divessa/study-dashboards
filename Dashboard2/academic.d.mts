@@ -1,0 +1,13 @@
+type Item = { [key: string]: string };
+export const enrollmentStatuses: string[];
+export const categories: string[];
+export const dateStatuses: string[];
+export const statuses: string[];
+export function isClosed(x: Item): boolean;
+export function dateOf(x: Item): string;
+export function hasConfirmedDate(x: Item): boolean;
+export function isExam(x: Item): boolean;
+export function isMainExam(x: Item): boolean;
+export function categoryOf(x: Item): string;
+export function isOutstandingWork(x: Item): boolean;
+export function statusesFor(x: Item): string[];
