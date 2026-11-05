@@ -1,8 +1,7 @@
-import { getHistory } from "./storage";
 import { useState } from "react";
 import type { Kind } from "./types";
 type Entry = {
-  id: number;
+  id: string;
   saved: string;
   before: Record<string, string> | null;
   after: Record<string, string> | null;
@@ -29,9 +28,11 @@ const value = (v: string | undefined) =>
 export default function ProgressHistory({
   kind,
   id,
+  getHistory,
 }: {
   kind: Kind;
   id: string;
+  getHistory: (kind: Kind, id: string) => Promise<Entry[]>;
 }) {
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [error, setError] = useState("");

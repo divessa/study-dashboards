@@ -1,0 +1,7 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Fail closed until the owner UID is provisioned and audited.
+    match /{document=**} { allow read, write: if false; }
+  }
+}

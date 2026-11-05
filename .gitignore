@@ -11,3 +11,8 @@ dist/
 playwright-report/
 test-results/
 site-output/
+private-cloud/generated.rules
+private-cloud/local/
+__pycache__/
+*.pyc
+cloudflare-dist/

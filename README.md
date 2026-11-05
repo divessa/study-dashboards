@@ -1,5 +1,5 @@
-# Study dashboards
+# Private study dashboards
 
-Two static, browser-local study tools: `ects/` for ECTS planning and `campus/` for courses, assessments and tasks. No server or account is required. ECTS data is stored in localStorage; Campus data and progress history are stored in IndexedDB. Browser storage is specific to a browser and device and can be cleared by the browser. Export JSON backups from each dashboard's settings before clearing storage or changing devices. Campus exports current records; its local progress history remains in the original browser.
+Two static dashboards are being adapted for Firebase Authentication and owner-only Firestore synchronization. This branch is not deployed and must not be used for private data until the production account, rules, registration settings and authorization tests are complete. The original local project and database remain the data sources.
 
-Run locally with `npm ci && npm run dev` in the repository root for ECTS, or in `Dashboard2` for Campus. Both build with `npm run build`. The `gh-pages` branch contains the current production build. GitHub Pages publishes updates to that branch. Automatic rebuilding from the source branch requires a GitHub Actions workflow.
+See `private-cloud/README.md` for the build and migration setup. Backups, database files, credentials and generated configuration must stay outside Git.

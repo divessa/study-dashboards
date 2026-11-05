@@ -1,11 +1,11 @@
 export const areas = [
   { id: "core", name: "Pflichtvorlesungen", target: 10, color: "#247b65" },
-  { id: "ie", name: "IE-Wahlmodule", target: 44, color: "#567bc9" },
+  { id: "ie", name: "Wahlmodule", target: 44, color: "#567bc9" },
   { id: "practical", name: "Masterpraktikum", target: 10, color: "#ad8452" },
   { id: "seminar", name: "Masterseminar", target: 5, color: "#9b77b6" },
   {
     id: "ethics",
-    name: "Ethics in Information Engineering",
+    name: "Ethik",
     target: 3,
     color: "#5b9395",
   },
@@ -152,7 +152,7 @@ export const official = [
   [
     ["Pflichtmodul A", 5],
     ["Pflichtmodul B", 5],
-    ["IE-Wahlmodule", 8],
+    ["Wahlmodule", 8],
     ["Ethik", 3],
     ["Management & Economics", 6],
     ["General Studies", 3],
@@ -160,11 +160,11 @@ export const official = [
   [
     ["Masterpraktikum", 10],
     ["Masterseminar", 5],
-    ["IE-Wahlmodule", 6],
+    ["Wahlmodule", 6],
     ["Management & Economics", 6],
     ["General Studies", 3],
   ],
-  [["IE-Wahlmodule", 30]],
+  [["Wahlmodule", 30]],
   [["Masterarbeit", 30]],
 ] as const;
 export const number = (value: number) =>

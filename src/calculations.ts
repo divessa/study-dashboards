@@ -19,10 +19,7 @@ function identityName(m: Module) {
     .replace(/^masterpraktikum\s+/, "")
     .replace(/\s*[·–-]?\s*(vorlesung|übung|lecture|exercise)\s*$/, "");
   return n
-    .replace(
-      "advanced topics on software engineering",
-      "advanced topics of software engineering",
-    )
+    .replace(/^advanced topics on /, "advanced topics of ")
     .replace(
       /^masterseminar(?: information engineering)?$/,
       "master seminar information engineering",

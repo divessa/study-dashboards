@@ -1,0 +1,34 @@
+import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
+import { doc, collection, getDoc, setDoc, deleteDoc, getDocFromServer, getDocsFromServer, runTransaction, onSnapshot, setLogLevel } from 'firebase/firestore';
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+import { createCloudStore, ConflictError } from './store.mjs';
+const env = await initializeTestEnvironment({projectId:'demo-study',firestore:{host:'127.0.0.1',port:8185,rules:readFileSync('private-cloud/generated.rules','utf8')}});
+setLogLevel('silent');
+try {
+ await env.clearFirestore();
+ const owner=env.authenticatedContext('test_owner_123').firestore();
+ const other=env.authenticatedContext('other_test_user').firestore();
+ const anonymous=env.unauthenticatedContext().firestore();
+ const path='users/test_owner_123/dashboards/ects';
+ await assertFails(getDoc(doc(anonymous,path))); await assertFails(setDoc(doc(anonymous,path),{test:1}));
+ await assertFails(getDoc(doc(other,path))); await assertFails(setDoc(doc(other,path),{test:1}));
+ await assertFails(setDoc(doc(other,'users/other_test_user/dashboards/ects'),{test:1}));
+ await assertFails(setDoc(doc(owner,'users/test_owner_123/dashboards/other'),{test:1}));
+ const store=createCloudStore({db:owner,api:{doc,collection,getDocFromServer,getDocsFromServer,runTransaction,onSnapshot},ownerUid:'test_owner_123',dashboard:'ects',validate:x=>x});
+ assert.equal(await store.load(),null);
+ await store.initialize({modules:[{name:'synthetic'}]},[{type:'progress',saved:'2026-01-01',before:null,after:{status:'done'}}]);
+ await assertSucceeds(getDoc(doc(owner,path)));
+ await assertFails(deleteDoc(doc(owner,path)));
+ await assert.rejects(store.initialize({modules:[]}),ConflictError);
+ await store.save(1,{modules:[{name:'synthetic revised'}]});
+ await assert.rejects(store.save(1,{modules:[]}),ConflictError);
+ const backup=await store.exportBackup();
+ assert.equal(backup.current.revision,2);assert.equal(backup.history.length,1);assert.equal(backup.legacy.length,1);
+ await assert.rejects(store.restore(1,{modules:[]},[]),ConflictError);
+ await store.restore(2,{modules:[{name:'restored synthetic'}]},[{type:'snapshot',data:{modules:[]}}]);
+ const restored=await store.exportBackup();assert.equal(restored.current.revision,3);assert.equal(restored.history.length,2);assert.equal(restored.legacy.length,2);
+ await assertFails(setDoc(doc(other,'users/test_owner_123/dashboards/ects/legacy/000000'),{tamper:true}));
+ await assertFails(deleteDoc(doc(owner,'users/test_owner_123/dashboards/ects/history/1')));
+ console.log('Firestore emulator passed: owner read/write, anonymous/other-user rejection, default deny, conflict protection and backup history.');
+} finally {await env.cleanup();}

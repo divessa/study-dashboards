@@ -63,7 +63,8 @@ import {
   semesterStats,
 } from "./calculations";
 import { migrateData, legacyPlan } from "./migration";
-import { loadData, parseData, saveData, serialize } from "./storage";
+import { parseData, serialize } from "./storage";
+import type { CloudAccess } from "../private-cloud/Gate";
 
 type Page =
   | "overview"
@@ -125,20 +126,11 @@ function Badge({ status }: { status: string }) {
   );
 }
 
-export default function App() {
-  const [loaded] = useState(() => {
-    try {
-      return loadData(localStorage);
-    } catch {
-      return loadData({
-        getItem: () => {
-          throw new Error();
-        },
-      });
-    }
-  });
-  const [data, setData] = useState<Data>(loaded.data),
-    [warning, setWarning] = useState(loaded.warning);
+export default function App({initial, cloud}: {initial: Data; cloud: CloudAccess<Data>}) {
+  const [data, setData] = useState<Data>(initial), [warning, setWarning] = useState("");
+  const [pending, setPending] = useState<{next:Data; error:string}|null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const pendingRef = useRef(false);
   const [page, setPage] = useState<Page>("overview"),
     [dark, setDark] = useState(() => {
       try {
@@ -174,35 +166,25 @@ export default function App() {
     const timer = setTimeout(() => setToast(""), 4000);
     return () => clearTimeout(timer);
   }, [toast]);
-  useEffect(() => {
-    const listener = (e: StorageEvent) => {
-      if (e.key === "studienkompass-public-v1")
-        setWarning(
-          "Die Daten wurden in einem anderen Fenster geändert. Bitte diese Seite neu laden, bevor du weiter bearbeitest.",
-        );
-    };
-    window.addEventListener("storage", listener);
-    return () => window.removeEventListener("storage", listener);
-  }, []);
-  function commit(modules: Module[]) {
-    const next: Data = {
-      ...data,
-      version: 1,
-      modules,
-      updatedAt: new Date().toISOString(),
-    };
+  async function transmit(next: Data) {
+    setSyncing(true);
     try {
-      saveData(localStorage, next);
-      setSaved(true);
-      setWarning("");
+      await cloud.save(next);
+      setPending(null); pendingRef.current = false; setSaved(true); setWarning("");
     } catch {
       setSaved(false);
-      setWarning(
-        "Speichern fehlgeschlagen. Änderungen sind nur in diesem Fenster verfügbar. Bitte jetzt als JSON exportieren.",
-      );
-    }
-    setData(next);
+      setPending({next, error: "Die Synchronisierung ist fehlgeschlagen oder der Cloud-Stand wurde geändert. Exportiere deine Änderungen, bevor du neu lädst. Bei einer Verbindungsstörung kannst du erneut versuchen."});
+    } finally { setSyncing(false); }
   }
+  function commit(modules: Module[]) {
+    if (pendingRef.current) return;
+    const next: Data = { ...data, version: 1, modules, updatedAt: new Date().toISOString() };
+    pendingRef.current = true; setData(next); setPending({next,error:""}); void transmit(next);
+  }
+  useEffect(() => {
+    const listener = (event: BeforeUnloadEvent) => { if (pending || editing) { event.preventDefault(); event.returnValue = ""; } };
+    window.addEventListener("beforeunload", listener); return () => window.removeEventListener("beforeunload", listener);
+  }, [pending, editing]);
   function update(module: Module) {
     commit(
       data.modules.some((m) => m.id === module.id)
@@ -210,7 +192,7 @@ export default function App() {
         : [...data.modules, module],
     );
     setEditing(null);
-    setToast("Modul gespeichert");
+    setToast("Änderung wird synchronisiert");
   }
   function go(id: Page) {
     setPage(id);
@@ -468,11 +450,11 @@ export default function App() {
           </div>
           <div className="local-status">
             <span className="status-dot" />
-            {saved ? "Lokal gespeichert" : "Nicht gespeichert"}
+            {saved ? "Cloud-Speicher" : "Nicht gespeichert"}
             <ShieldCheck size={14} />
           </div>
           <small className="privacy">
-            Deine Daten bleiben auf diesem Gerät.
+            Deine Daten werden privat synchronisiert.
           </small>
         </div>
       </aside>
@@ -528,7 +510,7 @@ export default function App() {
                     ? "Aufgehoben für später. Diese Module zählen nicht zum Fortschritt."
                     : page === "planner"
                       ? "Probiere deine nächste Entscheidung aus. Deine echten Daten bleiben bis zur Übernahme unverändert."
-                      : "Plane deinen Weg durch den M.Sc. Information Engineering."}
+                      : "Plane deinen Weg durch den Dein Masterstudium."}
               </p>
             </div>
             <div className="heading-actions">
@@ -569,7 +551,7 @@ export default function App() {
                     <span className="hero-tag">
                       <GraduationCap size={15} /> DEIN WEG ZUM MASTER
                     </span>
-                    <h2>M.Sc. Information Engineering</h2>
+                    <h2>Dein Masterstudium</h2>
                     <p>
                       4 Semester <span>·</span> 120 ECTS
                     </p>
@@ -959,7 +941,7 @@ export default function App() {
           <footer>
             <div>
               <ShieldCheck size={15} />
-              <span>Lokaler Studienkompass · Keine Cloud-Verbindung</span>
+              <span>Privater Studienkompass · Cloud-Speicher</span>
             </div>
             <div className="footer-actions">
               <button onClick={exportData}>
@@ -1001,7 +983,7 @@ export default function App() {
         </div>
       </main>
       <section className="print-report">
-        <h1>Studienübersicht · M.Sc. Information Engineering</h1>
+        <h1>Studienübersicht · Dein Masterstudium</h1>
         <p>
           Studienkompass · Stand{" "}
           {dateLabel(today())}
@@ -1068,6 +1050,7 @@ export default function App() {
           </div>
         ))}
       </section>
+      {pending && <div className="modal-backdrop"><div className="dialog" role="dialog" aria-modal="true"><h2>{syncing ? "Synchronisierung läuft" : "Änderung nicht synchronisiert"}</h2><p>{pending.error || "Bitte warten …"}</p>{!syncing && <div className="dialog-actions"><button className="button" onClick={() => {const url=URL.createObjectURL(new Blob([serialize(pending.next)],{type:"application/json"})); const a=document.createElement("a"); a.href=url; a.download="ungesicherte-aenderungen.json"; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000)}}>Änderungen exportieren</button><button className="button" onClick={() => void transmit(pending.next)}>Erneut versuchen</button><button className="button" onClick={() => {if(window.confirm("Neu laden? Exportiere die ungesicherten Änderungen zuerst.")) location.reload()}}>Neu laden</button></div>}</div></div>}
       {editing && (
         <ModuleEditor
           key={editing.id}

@@ -6,23 +6,29 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:cloudflare": "node private-cloud/build.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "firebase": "^13.2.0",
     "lucide-react": "^1.58.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "recharts": "^3.10.1"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "typescript": "^7.0.2",
     "vite": "^8.3.4"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.7"
   }
 }

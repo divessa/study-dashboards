@@ -1,4 +1,5 @@
-import { loadData, saveData, validateData } from "./storage";
+import { validateData } from "./storage";
+import type { CloudAccess } from "../../private-cloud/Gate";
 import { useEffect, useRef, useState } from "react";
 import {
   BookOpen,
@@ -68,10 +69,10 @@ const subtitles: Record<string, string> = {
   courses: "Prüfungsstrukturen verstehen. Anforderungen im Blick behalten.",
   calendar: "Alle Prüfungen und Abgaben — ohne Vorlesungsplan.",
   tasks: "Kleine Schritte für ein entspanntes Semester.",
-  settings: "Lokal gespeichert. Jederzeit in deiner Hand.",
+  settings: "Privat synchronisiert. Jederzeit in deiner Hand.",
 };
-export default function App() {
-  const [data, setData] = useState<Data | null>(null);
+export default function App({initial, cloud}: {initial: Data; cloud: CloudAccess<Data>}) {
+  const [data, setData] = useState<Data | null>(initial);
   const [loadError, setLoadError] = useState("");
   const [page, setPage] = useState("overview");
   const [selectedCourse, setSelectedCourse] = useState("");
@@ -102,9 +103,7 @@ export default function App() {
   const importRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const savingRef = useRef(false);
-  useEffect(() => {
-    loadData().then(setData).catch((e) => setLoadError(e.message));
-  }, []);
+
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("campus-theme", theme);
@@ -133,7 +132,7 @@ export default function App() {
     savingRef.current = true;
     setSaving(true);
     try {
-      const body = await saveData(next);
+      const body = await cloud.save({ ...next, revision: cloud.revision() + 1 });
       setData(body);
       return body;
     } finally {
@@ -141,6 +140,10 @@ export default function App() {
       setSaving(false);
     }
   }
+  useEffect(() => {
+    const listener = (event: BeforeUnloadEvent) => { if (saving || editor || confirmBusy) { event.preventDefault(); event.returnValue = ""; } };
+    window.addEventListener("beforeunload", listener); return () => window.removeEventListener("beforeunload", listener);
+  }, [saving, editor, confirmBusy]);
   const openNew = (kind: Kind, courseId = selectedCourse) =>
     setEditor({
       kind,
@@ -546,7 +549,7 @@ export default function App() {
           </button>
           <div className="local-note">
             <span className="local-dot" />
-            Lokal gespeichert{" "}
+            Privat synchronisiert{" "}
             <button
               className="icon-button"
               aria-label={
@@ -1455,7 +1458,7 @@ export default function App() {
                 </div>
                 <p className="form-help">
                   Ein Import ersetzt den aktuellen Datenbestand nach deiner
-                  Bestätigung. Der Fortschrittsverlauf bleibt in diesem Browser erhalten.
+                  Bestätigung. Der Fortschrittsverlauf wird privat synchronisiert.
                 </p>
                 <input
                   ref={importRef}
@@ -1514,7 +1517,7 @@ export default function App() {
                     Zeitzone<strong>Europe/Berlin</strong>
                   </span>
                   <span>
-                    Speicherung<strong>IndexedDB · in diesem Browser</strong>
+                    Speicherung<strong>Privater Cloud-Speicher</strong>
                   </span>
                   <span>
                     Version<strong>Campus 1.0</strong>
@@ -1529,7 +1532,7 @@ export default function App() {
               akademischen Überblick.
             </span>
             <span>
-              {saving ? "Wird gespeichert …" : "Privat & lokal"}
+              {saving ? "Wird gespeichert …" : "Privat & synchronisiert"}
               <span className="tiny-dot" />
               Europe/Berlin
             </span>
@@ -1542,6 +1545,19 @@ export default function App() {
           kind={editor.kind}
           item={editor.item}
           data={data}
+          getHistory={async (kind, id) => {
+            const backup = await cloud.history();
+            const fields = ["status", "grade", "enrollmentStatus", "score", "creditsEarned", "creditsManual", "lectureCompleted", "quizCompleted", "examSelected"];
+            const pick = (x: RecordData | undefined) => x ? Object.fromEntries(fields.filter(k => x[k] !== undefined).map(k => [k,x[k]])) : null;
+            const versions = [...backup.history, {data: backup.current.data, savedAt: new Date().toISOString()}];
+            const generated = versions.slice(1).flatMap((entry: any, i: number) => {
+              const a = pick(versions[i].data[kind].find((x:RecordData)=>x.id===id));
+              const b = pick(entry.data[kind].find((x:RecordData)=>x.id===id));
+              return JSON.stringify(a) === JSON.stringify(b) ? [] : [{id:`cloud-${i}`,saved:entry.savedAt,before:a,after:b}];
+            });
+            const legacy = backup.legacy.filter((x:any)=>x.type==='progress' && x.kind===kind && x.recordId===id).map((x:any)=>({id:`legacy-${x.id}`,saved:x.saved,before:x.before,after:x.after}));
+            return [...legacy,...generated].reverse();
+          }}
           onClose={() => setEditor(null)}
           onSave={async (value) => {
             const id = value.id || crypto.randomUUID();

@@ -18,6 +18,7 @@ type Props = {
   kind: Kind;
   item: RecordData;
   data: Data;
+  getHistory: (kind: Kind, id: string) => Promise<any[]>;
   onClose: () => void;
   onSave: (x: RecordData) => Promise<void>;
   onDelete: () => Promise<void>;
@@ -26,6 +27,7 @@ export default function Editor({
   kind,
   item,
   data,
+  getHistory,
   onClose,
   onSave,
   onDelete,
@@ -427,7 +429,7 @@ export default function Editor({
           {value.sourceNotes && (
             <p className="form-help">Quellenhinweis: {value.sourceNotes}</p>
           )}
-          {item.id && <ProgressHistory kind={kind} id={item.id} />}
+          {item.id && <ProgressHistory kind={kind} id={item.id} getHistory={getHistory} />}
           {kind !== "courses" && (
             <p className="form-help">
               Unbekannte Termine leer lassen. Bonus und freiwillige Leistungen
