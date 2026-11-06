@@ -121,9 +121,12 @@ export function calculate(
         "Warteliste",
     )
     .reduce((s, m) => s + m.ects, 0);
-  const unclear = unique
-    .filter((m) => m.credit === "Prüfung ausstehend")
-    .reduce((s, m) => s + m.ects, 0);
+  const unresolvedAllocations = unique.filter(
+    (m) => active(m) && m.credit === "Prüfung ausstehend",
+  );
+  const unresolvedBinding = unresolvedAllocations.filter(binding);
+  const unresolvedOutside = unresolvedAllocations.filter((m) => !binding(m));
+  const unclear = unresolvedAllocations.reduce((s, m) => s + m.ects, 0);
   return {
     byArea,
     earned,
@@ -134,7 +137,10 @@ export function calculate(
     progress: percent(earned + planned, 120),
     waiting,
     unclear,
-    allocationPending: unclear,
+    allocationPending: unresolvedBinding.reduce((s, m) => s + m.ects, 0),
+    allocationPendingRecords: unresolvedBinding,
+    allocationPendingOutside: unresolvedOutside.reduce((s, m) => s + m.ects, 0),
+    allocationPendingOutsideRecords: unresolvedOutside,
     recognitionPending: recognitionRequests.reduce((s, m) => s + m.ects, 0),
     recognitionRequests,
     duplicates,

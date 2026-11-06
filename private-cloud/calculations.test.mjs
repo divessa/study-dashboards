@@ -15,6 +15,16 @@ try {
  const specs=[[5,'core'],[5,'core'],[5,'ie'],[6,'ie'],[5,'ie'],[5,'ie'],[6,'management'],[6,'management'],[3,'ethics'],[3,'general'],[3,'general']];
  const workload=specs.map(([ects,area],i)=>makeModule('Synthetic '+i,ects,area,'Geplant',{credit:i===7?'Prüfung ausstehend':'Bestätigt',planStatus:'Verbindlich',provider:i>=9?'VHB':'TUM'}));
  const {semesterStats}=await vite.ssrLoadModule('/src/calculations.ts');
- assert.equal(semesterStats(workload,0).workload,52);assert.equal(semesterStats(workload,0).registered,46);assert.equal(calculate(workload).earned,0);
- console.log('ECTS calculation and duplicate-name normalization passed.');
+ workload[0].recognition='In Vorbereitung';
+ const project=makeModule('Synthetic extra',3,'general','Geplant',{credit:'Prüfung ausstehend',planStatus:'Nicht vorgesehen'});
+ const seminar=makeModule('Synthetic seminar',5,'seminar','Geplant',{semester:1,planStatus:'Unverbindlich',recognition:'In Vorbereitung'});
+ const practical=makeModule('Synthetic practical',10,'practical','Geplant',{semester:1,planStatus:'Unverbindlich',recognition:'In Vorbereitung'});
+ const original=calculate([...workload,project,seminar,practical]);
+ assert.equal(semesterStats(workload,0).workload,52);assert.equal(semesterStats(workload,0).registered,46);assert.equal(original.allocationPending,6);assert.equal(original.allocationPendingOutside,3);assert.equal(original.recognitionPending,20);
+ workload[7].credit='Bestätigt';workload[7].moduleCode='synthetic-game';
+ const exercise={...workload[7],id:'synthetic-exercise',name:workload[7].name+' Übung'};
+ const all=[...workload,exercise,project,seminar,practical];const corrected=calculate(all), semester=semesterStats(all,0);
+ assert.equal(semester.workload,52);assert.equal(semester.registered,52);assert.equal(corrected.planned,52);assert.equal(corrected.covered,52);assert.equal(corrected.missing,68);assert.equal(corrected.earned,0);assert.ok(Math.abs(corrected.progress-43.3333333333)<0.001);
+ assert.equal(corrected.byArea.find(a=>a.id==='management').covered,12);assert.equal(corrected.allocationPending,0);assert.equal(corrected.allocationPendingOutside,3);assert.equal(corrected.allocationPendingOutsideRecords[0].id,project.id);assert.equal(corrected.recognitionPending,20);
+ console.log('ECTS allocation, duplicates, separate warnings, recognition and progress passed.');
 } finally {await vite.close()}

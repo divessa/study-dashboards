@@ -672,12 +672,12 @@ export default function App({initial, cloud}: {initial: Data; cloud: CloudAccess
               </section>
               {stats.allocationPending > 0 && (
                 <div className="notice">
-                  {n(stats.allocationPending)} ECTS mit ungeklärter
-                  Bereichszuordnung (getrennt von Anerkennung).{" "}
-                  Bitte offene Bereichszuordnungen prüfen.
-                  Die bisherige Studienplanung wurde erhalten; aus alten
-                  Gesamtstatus übernommene Bindungen sind im Modul-Editor
-                  gekennzeichnet und können unabhängig geändert werden.
+                  {n(stats.allocationPending)} ECTS mit ungeklärter Bereichszuordnung innerhalb der verbindlichen Planung: {stats.allocationPendingRecords.map(m => m.name).join(", ")}. Bitte die Zuordnung prüfen.
+                </div>
+              )}
+              {stats.allocationPendingOutside > 0 && (
+                <div className="notice">
+                  {n(stats.allocationPendingOutside)} ECTS mit ungeklärter Bereichszuordnung außerhalb der verbindlichen Planung: {stats.allocationPendingOutsideRecords.map(m => m.name).join(", ")}. Diese Einträge reduzieren nicht die verbindliche Semesterplanung.
                 </div>
               )}
               <div className="section-heading">
@@ -1016,7 +1016,7 @@ export default function App({initial, cloud}: {initial: Data; cloud: CloudAccess
           {n(stats.earned)} erworben · {n(stats.planned)} verbindlich ·{" "}
           {n(stats.missing)} offen · {n(stats.waiting)} Warteliste ·{" "}
           {n(stats.recognitionPending)} Anerkennung ausstehend ·{" "}
-          {n(stats.allocationPending)} Zuordnung offen · {n(stats.excess)}{" "}
+          {n(stats.allocationPending)} Zuordnung in verbindlicher Planung offen · {n(stats.allocationPendingOutside)} außerhalb offen · {n(stats.excess)}{" "}
           überschüssig
         </p>
         <table>
